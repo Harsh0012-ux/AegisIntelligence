@@ -182,8 +182,3 @@ All records are local, controlled demo data. The Swagger UI is the source of tru
 ## Hackathon Project
 
 AegisIntelligence was developed as part of a hackathon. It is a prototype built under time constraints, and the limitations above reflect that scope.
-
-## Credits
-
-- **[Harsh](https://github.com/Harsh0012-ux)**: maintainer of this repository.
-- **[Ram](https://github.com/Ram0kr0singh)**: collaborator on the original BrandShield work, available in [BrandShieldWEB](https://github.com/Ram0kr0singh/BrandShieldWEB).
