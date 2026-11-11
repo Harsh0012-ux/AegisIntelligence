@@ -1,112 +1,189 @@
-# BrandShield
+<div align="center">
 
-BrandShield is a local, deterministic Digital Risk Protection competition prototype. It presents protected brand identity data, synthetic candidate monitoring, persisted detection evidence, investigation workflows, draft-only remediation, and an explanatory AI Analyst.
+<img src="docs/assets/banner.svg" alt="AegisIntelligence" width="100%">
+
+<br>
+
+[![Hackathon Project](https://img.shields.io/badge/Hackathon-Project-10b981?style=flat-square&labelColor=0b0f10)](#hackathon-project)
+[![Status](https://img.shields.io/badge/status-prototype-06b6d4?style=flat-square&labelColor=0b0f10)](#current-limitations)
+[![React](https://img.shields.io/badge/React%20%2B%20TypeScript-0b0f10?style=flat-square&logo=react&logoColor=06b6d4)](frontend)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0b0f10?style=flat-square&logo=fastapi&logoColor=10b981)](backend)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-0b0f10?style=flat-square&logo=postgresql&logoColor=06b6d4)](docker-compose.yml)
+
+### [**Live Demo**](https://aegis-intelligence-beta.vercel.app/) &nbsp;·&nbsp; [**API Docs**](https://brandshield-40ce.onrender.com/docs) &nbsp;·&nbsp; [**Architecture**](docs/ARCHITECTURE.md) &nbsp;·&nbsp; [**Setup**](docs/SETUP.md)
+
+</div>
+
+---
+
+## Overview
+
+Attackers register accounts and publish apps that imitate well-known brands (`N1ke Shopping`, `@nike_customer_help`) to phish customers. Spotting them means comparing every candidate against what the brand officially owns, and explaining *why* something is suspicious.
+
+**AegisIntelligence** (repository name; some internal files still say *BrandShield*) is a Digital Risk Protection prototype that does exactly that. It stores a protected brand's official identity, compares observed social-account and app-store candidates against it, and scores each one with a **deterministic, evidence-backed engine**. An optional LLM analyst can explain a finding, but it never changes the score.
+
+> **Scope note.** The current build analyses **stored observations and a controlled demo dataset**. Live collectors for Instagram, Google Play and the Apple App Store are **planned, not implemented**. See [Current limitations](#current-limitations).
+
+## Screenshots
+
+<table>
+  <tr>
+    <td colspan="2" align="center">
+      <img src="docs/screenshots/overview-dashboard.png" alt="Overview dashboard" width="100%"><br>
+      <sub><b>Overview.</b> Per-brand briefing with an orbital view of the protected core (centre), social candidates (left) and app candidates (right), plus threat counters.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/screenshots/source-monitoring.png" alt="Source monitoring and intelligence ledger" width="100%"><br>
+      <sub><b>Source status and intelligence ledger.</b> Collector state is shown honestly: only the demo dataset is online. Ledger rows come from persisted engine analysis.</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/screenshots/threat-surface.png" alt="Threat surface" width="100%"><br>
+      <sub><b>Threat Surface.</b> Radial map of candidates around the protected baseline, with a ledger showing publisher mismatch, classification, risk score and severity.</sub>
+    </td>
+  </tr>
+</table>
+
+<sub>Screenshots show the controlled demo dataset for the brand "Nike". They do not represent live monitoring.</sub>
+
+## Features
+
+| Capability | What it does |
+|---|---|
+| **Protected identity** | Persists a brand's official social accounts, apps and assets as the comparison baseline. |
+| **Social and app candidate analysis** | Scores observed social accounts and app-store listings against the baseline. |
+| **Look-alike detection** | Flags name variants and character substitutions (e.g. `N1ke`). |
+| **Publisher mismatch** | Compares an app's publisher against the authorised publisher; mismatches raise risk. |
+| **Check any name** | Ad-hoc analysis of an arbitrary name via `POST /api/analyze/name`. |
+| **Threat Surface** | Radial visualisation and filterable ledger (severity, channel, state). |
+| **Source status panel** | Reports which collectors are configured; live sources show as *Not configured*. |
+| **Explainable scoring** | Each result carries ordered, structured evidence. Similarity alone is capped below `MEDIUM`. |
+| **Optional AI analyst** | Server-side, Groq-compatible LLM that *explains* findings. Falls back to a deterministic explanation without an API key. |
+| **Draft-only remediation** | Generates takedown drafts marked *DRAFT ONLY, NOT SENT*. |
 
 ## Architecture
 
-`React + TypeScript (Vite, :5173)` → `FastAPI (:8000)` → `PostgreSQL (Docker Compose, :5432)`.
+```mermaid
+flowchart LR
+    U([Analyst]) --> FE["React + TypeScript<br/>Vite · Vercel"]
+    FE -->|REST /api| BE["FastAPI<br/>Render"]
+    BE --> ENG["Deterministic<br/>detection engine"]
+    ENG <--> DB[("PostgreSQL<br/>brands · candidates · analyses")]
+    BE -. optional, explanation only .-> LLM["Groq-compatible LLM"]
+    SEED["Controlled demo data<br/>(seed)"] --> DB
+    COL["Live collectors<br/>(planned)"] -. not implemented .-> DB
 
-The backend runs only from a repository-local Python 3.13 `.venv`. Alembic is configured for future schema changes. The frontend requests `GET /api/health` using `VITE_API_BASE_URL`; the API checks PostgreSQL before reporting a connected database.
+    classDef core fill:#0b0f10,stroke:#10b981,color:#e4e4e7;
+    classDef planned fill:#0b0f10,stroke:#52525b,color:#71717a,stroke-dasharray:4 4;
+    class FE,BE,ENG,DB,SEED core;
+    class COL,LLM planned;
+```
 
-## Prerequisites
+The detection pipeline and data model are documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-- Node.js 24 LTS and npm
-- Docker Desktop with Docker Compose
-- Python **3.13** registered with the Windows launcher (`py`)
+## Technology stack
 
-Do not install native PostgreSQL: the development database runs only through Docker Compose. Python 3.14 may remain installed globally; it is not used for this project.
+| Layer | Technology |
+|---|---|
+| Frontend | React, TypeScript, Vite |
+| Backend | FastAPI, SQLAlchemy, Alembic, Python 3.13 |
+| Database | PostgreSQL (Docker Compose) |
+| Analyst (optional) | Groq-hosted `openai/gpt-oss-120b` via an OpenAI-compatible endpoint |
+| Tooling | Docker Compose, pytest, Postman collections |
+| Hosting | Vercel (frontend), Render (API) |
 
-## First-time setup
+## Repository structure
 
-> Validation note: the frontend install, development server, and production build were validated when this foundation was created. The Python, Docker, migration, and API commands below are the required repeatable commands, but were not run in this checkout because Python 3.13 was unavailable through `py` and Docker Desktop's engine was stopped.
+```text
+AegisIntelligence/
+├── frontend/            React + TypeScript (Vite) UI and API client
+├── backend/             FastAPI app, SQLAlchemy models, Alembic migrations, tests
+├── data/                Controlled seed / demo data
+├── scripts/             Automation helpers
+├── docs/
+│   ├── ARCHITECTURE.md  System and detection-pipeline design
+│   ├── SETUP.md         Detailed local setup
+│   ├── assets/          README artwork
+│   └── screenshots/     Application screenshots
+├── .postman/, postman/  Postman collection and globals
+├── docker-compose.yml   Local PostgreSQL
+└── .env.example         Environment template
+```
 
-1. Copy `.env.example` to `.env`, then set a unique local `POSTGRES_PASSWORD` and make the password in `DATABASE_URL` match. To enable the Groq-hosted analyst, set `LLM_API_KEY` in `.env` to a valid Groq API key; `LLM_MODEL` and `LLM_BASE_URL` default to `openai/gpt-oss-120b` and `https://api.groq.com/openai/v1`. Without a key, the backend uses its deterministic fallback. `.env` is ignored by Git.
-2. Confirm the required interpreter: `py --list`.
-3. Create the project environment: `py -3.13 -m venv .venv`.
-4. Activate it: `.venv\Scripts\activate`.
-5. Confirm `python --version` is Python 3.13.x and `python -m pip --version` points inside `BrandShield\.venv`.
-6. Install backend dependencies: `python -m pip install -e ".\backend[dev]"`.
-7. Install frontend dependencies: `npm install --prefix frontend`.
+## Quick start
 
-## Run locally
-
-Start PostgreSQL and wait for it to become healthy:
-
-```powershell
+```bash
+cp .env.example .env              # then set a local POSTGRES_PASSWORD
 docker compose up -d postgres
-docker compose ps
+cd backend && python -m alembic upgrade head && python -m app.seed
+python -m uvicorn app.main:app --reload --port 8001
+# new terminal
+npm install --prefix frontend && npm run dev --prefix frontend
 ```
 
-Run the domain migration history, from `backend`:
+Open `http://localhost:5173`. Full instructions, including the Python 3.13 virtual environment, are in [docs/SETUP.md](docs/SETUP.md).
 
-```powershell
-..\.venv\Scripts\python.exe -m alembic upgrade head
-```
+## Environment variables
 
-Seed deterministic, clearly synthetic demo records (safe to run repeatedly):
+Copy `.env.example` to `.env`. The file is git-ignored; never commit real values.
 
-```powershell
-..\.venv\Scripts\python.exe -m app.seed
-```
+| Variable | Purpose | Default in template |
+|---|---|---|
+| `POSTGRES_DB` / `POSTGRES_USER` | Database name and user for Docker Compose | `brandshield` |
+| `POSTGRES_PASSWORD` | Local database password. **Set your own.** | placeholder |
+| `POSTGRES_PORT` | Host port for PostgreSQL | `5432` |
+| `DATABASE_URL` | SQLAlchemy URL. The password must match `POSTGRES_PASSWORD`. | local URL |
+| `CORS_ORIGINS` | Allowed frontend origin(s) | `http://localhost:5173` |
+| `VITE_API_BASE_URL` | API base URL used by the frontend. It must match the port you run uvicorn on. | `http://127.0.0.1:8001` |
+| `LLM_API_KEY` | Optional Groq key. Leave blank for the deterministic fallback. | empty |
+| `LLM_MODEL` | Analyst model | `openai/gpt-oss-120b` |
+| `LLM_BASE_URL` | OpenAI-compatible endpoint | `https://api.groq.com/openai/v1` |
+| `LLM_TIMEOUT_SECONDS` | Analyst request timeout | `20` |
 
-Start the API, from `backend`:
+## API
 
-```powershell
-..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
-```
+Interactive reference: **[Swagger UI](https://brandshield-40ce.onrender.com/docs)**.
 
-In another terminal, start the frontend:
+| Area | Endpoints |
+|---|---|
+| Health and dashboard | `GET /api/health` · `GET /api/dashboard/overview` |
+| Brands and assets | `GET` `POST /api/brands` · `GET` `PATCH /api/brands/{id}` · `GET /api/brands/{id}/assets` |
+| Official identity | `GET` `POST /api/brands/{id}/social-accounts` · `GET` `POST /api/brands/{id}/apps` |
+| Candidates | `GET` `POST /api/brands/{id}/social-candidates` · `GET` `POST /api/brands/{id}/app-candidates` |
+| Analysis and detections | `POST /api/analyze/name` · `POST /api/analyze/social/{candidate_id}` · `POST /api/analyze/app/{candidate_id}` · `POST /api/detections/scan` · `GET /api/detections` · `GET /api/detections/{id}` |
+| Monitoring | `POST /api/monitoring/scan` · `GET /api/monitoring/runs` · `GET /api/monitoring/runs/{id}` |
+| Sources | `GET /api/sources/status` |
+| Investigation | `GET /api/detections/{id}/investigation` · `POST /api/detections/{id}/status` · `POST /api/detections/{id}/notes` · `POST /api/detections/{id}/remediation-drafts` · `POST /api/detections/{id}/analyze` |
 
-```powershell
-npm run dev --prefix frontend
-```
+All records are local, controlled demo data. The Swagger UI is the source of truth if it differs from this table.
 
-Open `http://localhost:5173`. It displays the actual response from `http://localhost:8000/api/health`. Test the same endpoint in Postman with a GET request. A connected database returns `{"status":"ok","database":"connected"}`; an unreachable database returns a machine-readable degraded state.
+## Current limitations
 
-Build the frontend with `npm run build --prefix frontend`. Run backend tests from `backend` using `..\.venv\Scripts\python.exe -m pytest`.
+**Implemented:** persisted brand baseline, candidate storage, deterministic scoring with evidence, threat-surface and overview UI, optional server-side analyst, draft-only remediation.
 
-Stop the database with `docker compose down`; add `--volumes` only when intentionally discarding local database data. View logs with `docker compose logs postgres`.
+**Not implemented:**
 
-## DBeaver
+- Live social-media and app-store collection. The source panel shows these as *Not configured*, and the "Simulate outage" controls are demo-only.
+- Authentication and multi-tenant access control.
+- Automated takedown submission. Drafts are never sent.
+- Image or logo comparison. Remote logo URLs are reported as unavailable rather than scored.
 
-Use a normal PostgreSQL connection: host `localhost`, port from `POSTGRES_PORT` (default `5432`), database/user/password from your local `.env`. DBeaver is optional and is not needed at runtime.
 
-## Repository layout
 
-- `frontend/` — React/Vite UI shell and API client
-- `backend/` — FastAPI, SQLAlchemy session, and Alembic infrastructure
-- `data/` — future controlled seed/demo data
-- `docs/`, `scripts/` — documentation and automation space
+**Roadmap**
 
-## Current scope and demo safety
+1. Add deployment health checks and regression coverage.
+2. Build the first live collector behind the existing source-status interface.
+3. Add logo and visual similarity as an additional scoring signal.
+4. Add authentication and per-organisation brand workspaces.
+5. Add CI for backend tests and frontend builds.
 
-The demo uses persisted synthetic records only: it does not scrape social networks or app stores, and it does not submit takedowns. The deterministic detection engine remains authoritative for risk score, severity, classification, and evidence. The optional Groq-hosted analyst is server-side and explanatory only; without a usable provider it returns an evidence-grounded deterministic fallback. Remediation content is always **DRAFT ONLY — NOT SENT**.
+## Hackathon Project
 
-Use the dashboard to select Nike, run a local scan, open **N1ke Shopping**, and inspect its persisted risk, publisher mismatch, look-alike transformation, investigation workspace, remediation draft, and analyst explanation. The Brand Profile page shows the persisted official identity baseline used for comparisons.
+AegisIntelligence was developed as part of a hackathon. It is a prototype built under time constraints, and the limitations above reflect that scope.
 
-## Brand domain API
+## Credits
 
-All records below are local, controlled demo data; they are not scraped, live, or risk-scored.
-
-- `GET` / `POST` `/api/brands`
-- `GET` `/api/brands/{id}` and `/api/brands/{id}/assets`
-- `GET` / `POST` `/api/brands/{id}/social-accounts`
-- `GET` / `POST` `/api/brands/{id}/apps`
-- `GET` / `POST` `/api/brands/{id}/social-candidates`
-- `GET` / `POST` `/api/brands/{id}/app-candidates`
-
-The migration adds `brands`, `official_social_accounts`, `official_apps`, `official_brand_assets`, `social_candidates`, and `app_candidates`. DBeaver can inspect these tables using the existing local connection. Candidate rows remain observations (`NEW`, `REVIEWED`, or `IGNORED`) and intentionally carry no threat, risk, or confidence score.
-
-## Detection API
-
-The deterministic local engine persists one current analysis per candidate, with ordered structured evidence. Exact official-asset matches are always `SAFE`; remote logo URLs are explicitly reported as unavailable rather than assigned a fabricated score. The dashboard and monitoring views render these persisted results; the optional analyst explains them but cannot modify them.
-
-- `POST` `/api/analyze/name`
-- `POST` `/api/analyze/social/{candidate_id}`
-- `POST` `/api/analyze/app/{candidate_id}`
-- `POST` `/api/detections/scan`
-- `GET` `/api/detections` and `GET` `/api/detections/{id}`
-
-Scores use available name, look-alike, description, and publisher signals. A similarity-only outcome is capped below `MEDIUM`; the score is not a statistical confidence measure. No live scraping is used. The optional server-side analyst may call the configured Groq-compatible endpoint, while the browser never sends credentials to a provider.
-
-Not implemented: live scraping, live external-platform monitoring, authentication, automated takedowns, and production deployment.
+- **[Harsh](https://github.com/Harsh0012-ux)**: maintainer of this repository.
+- **[Ram](https://github.com/Ram0kr0singh)**: collaborator on the original BrandShield work, available in [BrandShieldWEB](https://github.com/Ram0kr0singh/BrandShieldWEB).
